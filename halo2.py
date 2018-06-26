@@ -6,13 +6,8 @@ import urllib.request
 from bs4 import BeautifulSoup
 from pathlib import Path
 
-lock = threading.Lock()
-
 
 def get_data(game_id):
-    lock.acquire()
-    print(str(threading.current_thread().getName()) + ": " + str(game_id))
-    lock.release()
 
     url = 'http://halo.bungie.net/Stats/GameStatsHalo2.aspx?gameid=' + str(game_id)
     page = urllib.request.urlopen(url)
@@ -122,13 +117,13 @@ def get_data(game_id):
                 col_name = columns[j]
                 item = total_row[j]
                 if col_name == "Players":
-                    if item.find("Team Red") == 0\
-                        or item.find("Team Blue") == 0\
-                        or item.find("Team Green") == 0\
-                        or item.find("Team Orange") == 0\
-                        or item.find("Team Brown") == 0\
-                        or item.find("Team Yellow") == 0\
-                    or item.find("Team Pink") == 0:
+                    if item.find("Red Team") == 0\
+                        or item.find("Blue Team") == 0\
+                        or item.find("Green Team") == 0\
+                        or item.find("Orange Team") == 0\
+                        or item.find("Brown Team") == 0\
+                        or item.find("Yellow Team") == 0\
+                    or item.find("Pink Team") == 0:
                         last_team = item
                         has_teams = True
                         is_team = True
@@ -168,10 +163,10 @@ def get_data(game_id):
                         item = re.split(r'\s+', item)
                         tools = dict()
                         weapon = ""
-                        for i in range(3, len(item)):
-                            word = item[i]
+                        for k in range(3, len(item)):
+                            word = item[k]
                             if word.isdigit() and weapon is not "":
-                                tools[weapon.lower()] = word;
+                                tools[weapon.lower()] = word
                                 weapon = ""
                             elif word.find('(') == -1:
                                 weapon += word
@@ -188,9 +183,9 @@ def get_data(game_id):
                         item = re.split(r'\s+', item)
                         killed = dict()
                         player = ""
-                        for i in range(2, len(item)):
-                            word = item[i]
-                            if word.isdigit() and i is not len(item) - 1:
+                        for k in range(2, len(item)):
+                            word = item[k]
+                            if word.isdigit() and k is not len(item) - 1:
                                 if player not in killed:
                                     killed[player] = word
                                 else:
@@ -215,9 +210,9 @@ def get_data(game_id):
                         item = re.split(r'\s+', item)
                         killed_by = dict()
                         player = ""
-                        for i in range(2, len(item)):
-                            word = item[i]
-                            if word.isdigit() and i is not len(item) - 1:
+                        for k in range(2, len(item)):
+                            word = item[k]
+                            if word.isdigit() and k is not len(item) - 1:
                                 if player not in killed_by:
                                     killed_by[player] = word
                                 else:
@@ -254,20 +249,36 @@ def get_data(game_id):
     else:
         output["players"] = teams
 
-    with open(os.getcwd() + "/data/halo_2_gameid_" + str(game_id) + ".json", 'w') as file:
+    with open("E:/Halo 2 Data/halo_2_gameid_" + str(game_id) + ".json", 'w') as file:
         json.dump(output, file)
+
+lock = threading.Lock()
 
 
 def work(start, end):
+    started = False
     for i in range(start, end):
-        file = Path(os.getcwd() + "/data/halo_2_gameid_" + str(i) + ".json")
-        if not file.is_file():
+        if started:
+            get_data(i)
+        elif i not in generated:
+            if not started:
+                lock.acquire()
+                print(threading.current_thread().getName() + " starting at " + str(i))
+                lock.release()
+                started = True
             get_data(i)
 
 START = 6066
 END = 803138050
 SUM = END-START
 WORK_PER_THREAD = int(SUM / 16)
+
+file_list = os.listdir("E:/Halo 2 Data/")
+generated = set()
+
+for file in file_list:
+    file = file[file.rfind('_')+1:file.find('.')]
+    generated.add(int(file))
 
 st = START
 for i in range(16):
