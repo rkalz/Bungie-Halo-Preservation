@@ -1,12 +1,19 @@
 import json
 import os
 import re
+import threading
 import urllib.request
 from bs4 import BeautifulSoup
+from pathlib import Path
+
+lock = threading.Lock()
 
 
 def get_data(game_id):
-    print(game_id)
+    lock.acquire()
+    print(str(threading.current_thread().getName()) + ": " + str(game_id))
+    lock.release()
+
     url = 'http://halo.bungie.net/Stats/GameStatsHalo2.aspx?gameid=' + str(game_id)
     page = urllib.request.urlopen(url)
     soup = BeautifulSoup(page, "html.parser")
@@ -115,7 +122,13 @@ def get_data(game_id):
                 col_name = columns[j]
                 item = total_row[j]
                 if col_name == "Players":
-                    if item.find("Team") != -1:
+                    if item.find("Team Red") == 0\
+                        or item.find("Team Blue") == 0\
+                        or item.find("Team Green") == 0\
+                        or item.find("Team Orange") == 0\
+                        or item.find("Team Brown") == 0\
+                        or item.find("Team Yellow") == 0\
+                    or item.find("Team Pink") == 0:
                         last_team = item
                         has_teams = True
                         is_team = True
@@ -210,7 +223,7 @@ def get_data(game_id):
                                 else:
                                     number = 2
                                     name = player + '(' + str(number) + ')'
-                                    while name in killed:
+                                    while name in killed_by:
                                         number += 1
                                         name = player + '(' + str(number) + ')'
                                     killed_by[name] = word
@@ -220,9 +233,9 @@ def get_data(game_id):
                         if player.find('\n') != -1:
                             player = player[:player.find('\n')]
                         if has_teams:
-                            teams[last_team]["players"][player]["most killed by"] = killed
+                            teams[last_team]["players"][player]["most killed by"] = killed_by
                         else:
-                            teams[player]["most killed by"] = killed
+                            teams[player]["most killed by"] = killed_by
 
                 elif has_teams and not is_team:
                     if total_row[0].find('\n') != -1:
@@ -245,12 +258,24 @@ def get_data(game_id):
         json.dump(output, file)
 
 
-last = os.listdir(os.getcwd() + "/data/")
-last.sort()
-last = last[-1]
-last = last[last.rfind('_')+1:last.find('.')]
+def work(start, end):
+    for i in range(start, end):
+        file = Path(os.getcwd() + "/data/halo_2_gameid_" + str(i) + ".json")
+        if not file.is_file():
+            get_data(i)
 
-for i in range(int(last), 1000000):
-    get_data(i)
+START = 6066
+END = 803138050
+SUM = END-START
+WORK_PER_THREAD = int(SUM / 16)
 
+st = START
+for i in range(16):
+    t = threading.Thread(target=work, args=[st, st + WORK_PER_THREAD])
+    t.start()
+    st += WORK_PER_THREAD
 
+main_thread = threading.current_thread()
+for t in threading.enumerate():
+    if t is not main_thread:
+        t.join()
