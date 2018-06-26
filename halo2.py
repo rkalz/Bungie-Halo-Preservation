@@ -241,7 +241,7 @@ def get_data(game_id):
     else:
         output["players"] = teams
 
-    with open(os.getcwd() + "/data/halo_2_gameid_" + str(id) + ".json", 'w') as file:
+    with open(os.getcwd() + "/data/halo_2_gameid_" + str(game_id) + ".json", 'w') as file:
         json.dump(output, file)
 
 
