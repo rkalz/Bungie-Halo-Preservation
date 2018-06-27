@@ -117,13 +117,13 @@ def get_data(game_id):
                 col_name = columns[j]
                 item = total_row[j]
                 if col_name == "Players":
-                    if item.find("Red Team") == 0\
-                        or item.find("Blue Team") == 0\
-                        or item.find("Green Team") == 0\
-                        or item.find("Orange Team") == 0\
-                        or item.find("Brown Team") == 0\
-                        or item.find("Yellow Team") == 0\
-                    or item.find("Pink Team") == 0:
+                    if item is "Red Team"\
+                        or item is "Blue Team"\
+                        or item is "Green Team"\
+                        or item is "Orange Team"\
+                        or item is "Brown Team"\
+                        or item is "Yellow Team"\
+                    or item is "Pink Team":
                         last_team = item
                         has_teams = True
                         is_team = True
@@ -259,19 +259,32 @@ def work(start, end):
     started = False
     for i in range(start, end):
         if started:
-            get_data(i)
+            try:
+                get_data(i)
+            except Exception as e:
+                lock.acquire()
+                print(threading.current_thread().getName() + ": " + str(e))
+                lock.release()
+                continue
+
         elif i not in generated:
             if not started:
                 lock.acquire()
                 print(threading.current_thread().getName() + " starting at " + str(i))
                 lock.release()
                 started = True
-            get_data(i)
+            try:
+                get_data(i)
+            except Exception as e:
+                lock.acquire()
+                print(threading.current_thread().getName() + ": " + str(e))
+                lock.release()
+                continue
 
 START = 6066
 END = 803138050
 SUM = END-START
-WORK_PER_THREAD = int(SUM / 16)
+WORK_PER_THREAD = int(SUM / 24)
 
 file_list = os.listdir("E:/Halo 2 Data/")
 generated = set()
@@ -281,7 +294,7 @@ for file in file_list:
     generated.add(int(file))
 
 st = START
-for i in range(16):
+for i in range(24):
     t = threading.Thread(target=work, args=[st, st + WORK_PER_THREAD])
     t.start()
     st += WORK_PER_THREAD
