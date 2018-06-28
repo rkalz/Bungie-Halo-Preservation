@@ -7,11 +7,11 @@ from bs4 import BeautifulSoup
 from multiprocessing.pool import ThreadPool
 
 
-def get_metadata(map_and_gametype):
+def get_metadata(metadata):
     gametype, mapname, playlist, date, time = \
         None, None, None, None, None
 
-    for line in map_and_gametype.text.split('\n'):
+    for line in metadata.text.split('\n'):
         line = line.strip()
         if line.find(" on ") != -1:
             gametype = line[:line.find(" on")]
@@ -25,56 +25,53 @@ def get_metadata(map_and_gametype):
     return gametype, mapname, playlist, date, time
 
 
-def get_team_data(rows, carnage_rows):
+def get_team_data(carnage_rows):
     teams = dict()
-    ranked = dict()
     has_teams = False
     last_team = None
     columns = None
-    for i in range(rows):
+    for i in range(len(carnage_rows)):
         total_row = []
-        if carnage_rows is not None:
-            row = carnage_rows[i]
-            cols = row.find_all("td")
-            for col in cols:
-                text = col.text.strip()
-                if text == "K/D Spread":
-                    text = "Spread"
-                total_row.append(text)
-                exp_bar = col.find("div", {"class": "ExpBar"})
-                if exp_bar is not None:
-                    style = exp_bar.find("span").get("style")
-                    progress = style[style.find(':') + 1:style.find("px")]
-                    ranked[total_row[0][:total_row[0].find('\n')]] = str(int(progress) * 2.5)
+        row = carnage_rows[i]
+        cols = row.find_all("td")
+        for col in cols:
+            text = col.text.strip()
+            if text == "K/D Spread":
+                text = "Spread"
+            total_row.append(text)
         if i is 0:
             columns = total_row
         else:
             is_team = False
             for j in range(len(columns)):
+                # Identify this column's attribute and add to appropriate target
                 col_name = columns[j]
                 item = total_row[j]
-                player_newline_indent = total_row[0].find('\n')
+                player_front_newline_indent = total_row[0].find('\n')
+                player_back_newline_indent = total_row[0].rfind('\n')
                 if col_name == "Players":
-                    if item == "Red Team" \
-                            or item == "Blue Team" \
-                            or item == "Green Team" \
-                            or item == "Orange Team" \
-                            or item == "Brown Team" \
-                            or item == "Yellow Team" \
+                    # Every name in here is either a team name or a gamertag
+                    if item == "Red Team" or item == "Blue Team" or item == "Green Team" \
+                            or item == "Orange Team" or item == "Brown Team" or item == "Yellow Team" \
                             or item == "Pink Team":
+                        # All possible team names (If there's an 8th, I haven't found it)
                         last_team = item
                         has_teams = True
                         is_team = True
                         teams[item] = dict()
                         teams[item]["players"] = dict()
                     elif has_teams:
-                        if player_newline_indent != -1:
-                            player = item[:player_newline_indent]
-                            rank = item[player_newline_indent + 1:]
+                        if player_front_newline_indent != -1 and player_back_newline_indent != -1:
+                            # Indicates that this was a ranked game
+                            # Player\n \nRank
+                            player = item[:player_front_newline_indent]
+                            rank = item[player_back_newline_indent + 1:]
                             teams[last_team]["players"][player] = dict()
                             teams[last_team]["players"][player]["rank"] = rank
-                            teams[last_team]["players"][player]["progress"] = ranked[player]
                         else:
+                            # Check for guests (not allowed in ranked play)
+                            # All guests are reported as Gamertag(G), even if multiple
+                            # Append number for additional guests (should only be 2, 3, or 4)
                             if item not in teams[last_team]["players"]:
                                 teams[last_team]["players"][item] = dict()
                             else:
@@ -87,24 +84,26 @@ def get_team_data(rows, carnage_rows):
                                 total_row[j] = item
                                 teams[last_team]["players"][item] = dict()
                     else:
-                        if player_newline_indent != -1:
-                            player = item[:player_newline_indent]
-                            rank = item[player_newline_indent + 1:]
+                        # FFA ranked game
+                        if player_front_newline_indent != -1 and player_back_newline_indent != -1:
+                            player = item[:player_front_newline_indent]
+                            rank = item[player_back_newline_indent + 1:]
                             teams[player] = dict()
                             teams[player]["rank"] = rank
-                            teams[player]["progress"] = ranked[player]
                         else:
                             teams[item] = dict()
 
                 elif has_teams and not is_team:
-                    if player_newline_indent != -1:
-                        teams[last_team]["players"][total_row[0][:player_newline_indent]][col_name.lower()] = item
+                    # Assign attribute to player, located in team dict
+                    if player_front_newline_indent != -1:
+                        teams[last_team]["players"][total_row[0][:player_front_newline_indent]][col_name.lower()] = item
                     else:
                         teams[last_team]["players"][total_row[0]][col_name.lower()] = item
 
                 else:
-                    if player_newline_indent != -1:
-                        teams[total_row[0][:player_newline_indent]][col_name.lower()] = item
+                    # Free for all game
+                    if player_front_newline_indent != -1:
+                        teams[total_row[0][:player_front_newline_indent]][col_name.lower()] = item
                     else:
                         teams[total_row[0]][col_name.lower()] = item
 
@@ -113,27 +112,23 @@ def get_team_data(rows, carnage_rows):
 
 def get_data(game_id):
 
-    url = 'http://halo.bungie.net/Stats/GameStatsHalo2.aspx?gameid=' + str(game_id)
+    url = 'http://halo.bungie.net/Stats/GameStatsHalo3.aspx?gameid=' + str(game_id)
     page = urllib.request.urlopen(url)
     soup = BeautifulSoup(page, "html.parser")
     pool = multiprocessing.pool.ThreadPool(2)
 
     output = dict()
-    output["id"] = game_id
+    output["id"] = str(game_id)
 
-    rows = 0
+    # The carnage tab essentially has all the remaining data
     carnage_rows = soup.find("div", {"id": "ctl00_mainContent_bnetpgd_pnlKills"}) \
-        .find("table", {"class": "stats"})
-    if carnage_rows is not None:
-        carnage_rows = carnage_rows.find_all("tr")
-        rows = len(carnage_rows)
+        .find("table", {"class": "stats"}).find_all("tr")
+    async_team_data = pool.apply_async(get_team_data, [carnage_rows])
 
-    async_team_data = \
-        pool.apply_async(get_team_data, [rows, carnage_rows])
-
-    map_and_gametype = soup.find("div", {"class": "stats_overview"})\
+    # Get information about the map, gametype, playlist, and other metadata
+    metadata = soup.find("div", {"class": "stats_overview"})\
         .find("ul", {"class": "summary"})
-    async_metadata = pool.apply_async(get_metadata, [map_and_gametype])
+    async_metadata = pool.apply_async(get_metadata, [metadata])
 
     gametype, mapname, playlist, date, time = async_metadata.get()
     output["gametype"] = gametype
@@ -143,12 +138,13 @@ def get_data(game_id):
     output["time"] = time
 
     teams, has_teams = async_team_data.get()
+    # JSON tag based on if team game or FFA
     if has_teams:
         output["teams"] = teams
     else:
         output["players"] = teams
 
-    with open("halo_2_game_" + str(game_id) + ".json", 'w') as file:
+    with open("halo_3_game_" + str(game_id) + ".json", 'w') as file:
         json.dump(output, file)
 
 
@@ -182,8 +178,8 @@ def work(start, end):
                 continue
 
 
-START = 6066
-END = 803138050
+START = 1
+END = 1917736473
 SUM = END-START
 WORK_PER_THREAD = int(SUM / 24)
 
@@ -207,4 +203,4 @@ for t in threading.enumerate():
         t.join()
 '''
 
-get_data(803000000)
+get_data(1889748906)
