@@ -1,7 +1,5 @@
-import cProfile
 import json
 import os
-import re
 import multiprocessing
 import threading
 import urllib.request
@@ -10,8 +8,8 @@ from multiprocessing.pool import ThreadPool
 
 
 def get_metadata(map_and_gametype):
-    gametype, mapname, playlist, date, time, duration = \
-        None, None, None, None, None, None
+    gametype, mapname, playlist, date, time = \
+        None, None, None, None, None
 
     for line in map_and_gametype.text.split('\n'):
         line = line.strip()
@@ -20,26 +18,11 @@ def get_metadata(map_and_gametype):
             mapname = line[line.find("n ") + 2:]
         elif line.find('-') != -1:
             playlist = line[line.find('- ') + 2:]
-        elif ',' in line:
-            split = line.split(", ")
-            date = split[0]
-            time = split[1]
-        elif "Length" in line:
-            split = line.split(": ")
-            if len(split) == 2:
-                duration = split[1]
+        elif line.find(',') != -1:
+            date = line[:line.find(',')]
+            time = line[line.find(',') + 2:]
 
-    return gametype, mapname, playlist, date, time, duration
-
-
-def get_medals(medal_rows):
-    medals = dict()
-    for medal_row in medal_rows:
-        title = medal_row.find("div", {"class": "title"})
-        count = medal_row.find("div", {"class": "number"})
-        if title is not None and count is not None and title.text not in medals:
-            medals[title.text] = count.text
-    return medals
+    return gametype, mapname, playlist, date, time
 
 
 def get_team_data(rows, carnage_rows):
@@ -133,7 +116,7 @@ def get_data(game_id):
     url = 'http://halo.bungie.net/Stats/GameStatsHalo2.aspx?gameid=' + str(game_id)
     page = urllib.request.urlopen(url)
     soup = BeautifulSoup(page, "html.parser")
-    pool = multiprocessing.pool.ThreadPool(3)
+    pool = multiprocessing.pool.ThreadPool(2)
 
     output = dict()
     output["id"] = game_id
@@ -152,21 +135,12 @@ def get_data(game_id):
         .find("ul", {"class": "summary"})
     async_metadata = pool.apply_async(get_metadata, [map_and_gametype])
 
-    medal_rows = soup.find("div", {"class": "ranked_medals_row"}).find_all("div")
-    async_medals = pool.apply_async(get_medals, [medal_rows])
-
-    gametype, mapname, playlist, date, time, duration = async_metadata.get()
+    gametype, mapname, playlist, date, time = async_metadata.get()
     output["gametype"] = gametype
     output["map"] = mapname
     output["playlist"] = playlist
     output["date"] = date
     output["time"] = time
-    if duration is not None:
-        output["duration"] = duration
-
-    medals = async_medals.get()
-    if len(medals) is not 0:
-        output["medals"] = medals
 
     teams, has_teams = async_team_data.get()
     if has_teams:
@@ -233,4 +207,4 @@ for t in threading.enumerate():
         t.join()
 '''
 
-get_data(6066)
+get_data(803000000)
