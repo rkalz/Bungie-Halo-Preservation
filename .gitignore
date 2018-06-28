@@ -2,3 +2,4 @@ data/
 venv/
 .DS_Store
 .idea/
+*_game_*.json
