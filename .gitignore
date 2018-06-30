@@ -3,3 +3,4 @@ venv/
 .DS_Store
 .idea/
 *.json
+files_to_fix.txt
