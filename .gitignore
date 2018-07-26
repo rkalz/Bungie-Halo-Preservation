@@ -4,3 +4,4 @@ venv/
 .idea/
 *.json
 files_to_fix.txt
+fixed_files/
