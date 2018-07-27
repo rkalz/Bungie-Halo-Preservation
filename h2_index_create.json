@@ -2,16 +2,60 @@
   "mappings": {
     "_doc": {
       "properties": {
-        "players" : { "enabled": false },
+        "players": {
+          "enabled": false
+        },
         "teams": {
           "properties": {
-            "Red Team":    { "enabled": false  },
-            "Blue Team":   { "enabled": false  },
-            "Green Team":  { "enabled": false  },
-            "Orange Team": { "enabled": false  },
-            "Brown Team":  { "enabled": false  },
-            "Yellow Team": { "enabled": false  },
-            "Pink Team":   { "enabled": false  }
+            "Red Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Blue Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Green Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Orange Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Brown Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Yellow Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            },
+            "Pink Team": {
+              "properties": {
+                "players": {
+                  "enabled": false
+                }
+              }
+            }
           }
         }
       }
